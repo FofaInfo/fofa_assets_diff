@@ -1,0 +1,4 @@
+{:paths ["./"]
+ :deps {
+        lambdaisland/uri {:mvn/version "1.15.125"}
+        }}
