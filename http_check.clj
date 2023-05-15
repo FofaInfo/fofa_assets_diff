@@ -1,20 +1,13 @@
 #!/usr/bin/env bb
 
-(defn run-dnsx [file]
-  (println :run-dnsx (str file))
-  (some->> (shell/sh "dnsx" "-a" "-silent" "-resp" "-l" (str file))
+(load-file "util.clj")
+
+(defn run-httpx [file]
+  (println :run-httpx (str file))
+  (some->> (shell/sh "httpx" "-silent" "-l" (str file))
            :out
            str/split-lines
-           (map #(let [[domain ip] (str/split % #"\s+")]
-                   (try
-                     [domain (str/replace ip #"\[|\]" "")]
-                     (catch Exception e
-                       (println "process" domain ":" ip "error" (ex-message e))
-                       nil))))
-           (filter identity)
-           seq ;; fix lazy-seq apply
-           (apply map vector)))
-
+           (map get-uri-domain)))
 
 (require '[babashka.cli :as cli])
 
@@ -23,7 +16,7 @@
                          :alias :p
                          :coerce fs/file
                          }
-                  :out {:default "./paypal/chaos-dns"
+                  :out {:default "./paypal/chaos-http"
                         :alias :o
                         :coerce fs/file
                         }
@@ -33,6 +26,7 @@
 (defn print-opts
   []
   (println)
+  (println "check domain http probe:")
   (println "  options:")
   (println (cli/format-opts {:spec cli-options})))
 
@@ -47,8 +41,8 @@
 
     (doseq [f1 (-> (fs/expand-home path)
                    (fs/glob "*.txt"))]
-      (println "dns process" (str f1))
-      (let [[hosts _] (run-dnsx f1)]
+      (println "http probe process" (str f1))
+      (let [hosts (run-httpx f1)]
         (when (seq hosts)
           (spit
            (str (fs/file out (fs/file-name f1)))
@@ -57,8 +51,7 @@
 (try
   (apply -main *command-line-args*)
   (catch Exception e
-    (println "domain dns resolver:")
+    (println "check domain http probe")
     (println "error: " (ex-message e) e)
     (print-opts)
     (System/exit 1)))
-

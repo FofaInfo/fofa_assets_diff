@@ -1,4 +1,5 @@
 {:paths ["./"]
  :deps {
         lambdaisland/uri {:mvn/version "1.15.125"}
+        de.malkusch.whois-server-list/public-suffix-list {:mvn/version "2.2.0"}
         }}

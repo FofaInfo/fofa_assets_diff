@@ -1,39 +1,5 @@
 #!/usr/bin/env bb
 
-
-(require '[lambdaisland.uri :refer [uri join]])
-
-(defn read-bom-file
-  "兼容BOM"
-  [file]
-  (let [content (slurp file :encoding "UTF-8")]
-    (if (.startsWith content "\uFEFF")
-      (-> content (.substring 1))
-      content)))
-
-(defn read-csv-headline
-  [file]
-  (let  [data (csv/read-csv (read-bom-file file))
-         d-keys (map keyword (first data))]
-    (mapv #(zipmap d-keys %) (rest data))))
-
-(def get-uri-domain (comp :host uri))
-
-(defn parse-fofa-hosts
-  [fofa-path]
-  (->> (fs/expand-home fofa-path)
-       str
-       read-csv-headline
-       (group-by :domain)
-       (filter #(not= "" (first %)))
-       (map (fn [[k v]] [k (->> v
-                                (map (comp get-uri-domain :host))
-                                (filter identity)
-                                set
-                                )]))
-       (into {})))
-
-
 (defn read-chaos-infos
   [chaos-root]
   (-> (fs/expand-home chaos-root)
@@ -221,19 +187,19 @@
 
 (require '[babashka.cli :as cli])
 
-(def cli-options {:path {:default "/tmp/paypal2"
+(def cli-options {:d1-path {:default "./paypal/fofa"
                          :validate fs/directory?
-                         :alias :p
+                         :alias :d1
+                         :coerce fs/file
+                         }
+                  :d2-path {:default "./paypal/chaos"
+                         :validate fs/directory?
+                         :alias :d2
                          :coerce fs/file
                          }
                   :resolved-dns {:default false
                                  :alias :a
                                  :coerce :boolean}
-                  :fofa-file {:default "/tmp/paypal.csv"
-                              :validate fs/exists?
-                              :alias :f
-                              :coerce fs/file
-                              }
                   :out-file {:default "/tmp/diff.html"
                              :alias :o
                              :coerce fs/file
@@ -244,36 +210,39 @@
 (defn print-opts
   []
   (println)
+  (println "host data diff, compare chaos db hosts:")
   (println "  options:")
   (println (cli/format-opts {:spec cli-options})))
 
 (defn -main [& args]
-  (let [{:keys [path resolved-dns fofa-file out-file help]} (cli/parse-opts args {:spec cli-options})]
+  (let [{:keys [d1-path d2-path resolved-dns out-file help]} (cli/parse-opts args {:spec cli-options})]
     (when help
       (print-opts)
       (System/exit 0))
-    (let [chaos-hosts (if resolved-dns
-                        (->> (read-chaos-infos path)
-                             (map #(vector (:domain %) (set (:hosts %))))
-                             (into {}))
-                        (read-chaos-hosts path))
-          fofa-hosts (parse-fofa-hosts fofa-file)
-          fofa-root-domains (keys fofa-hosts)
-          chaos-root-domains (keys chaos-hosts)
-          all-domains (set (concat fofa-root-domains chaos-root-domains))]
+    (let [read-hosts  (fn [path]
+                        (if resolved-dns
+                          (->> (read-chaos-infos path)
+                               (map #(vector (:domain %) (set (:hosts %))))
+                               (into {}))
+                          (read-chaos-hosts path)))
+          d1-hosts (read-hosts d1-path)
+          d2-hosts (read-hosts d2-path)
+          d1-root-domains (keys d1-hosts)
+          d2-root-domains (keys d2-hosts)
+          all-domains (set (concat d1-root-domains d2-root-domains))]
       (->> all-domains
            (map (fn [d]
                   {:title d
-                   :diff (diff-set (get fofa-hosts d) (get chaos-hosts d))}))
+                   :diff (diff-set (get d1-hosts d) (get d2-hosts d))}))
            (concat [{:title "root-domains"
-                     :diff (diff-set fofa-root-domains chaos-root-domains)}])
+                     :diff (diff-set d1-root-domains d2-root-domains)}])
            generate-html
            (spit out-file)))))
 
 (try
   (apply -main *command-line-args*)
   (catch Exception e
-    (println "fofa data diff:")
+    (println "host data diff:")
     (println "error: " (ex-message e) e)
     (print-opts)
     (System/exit 1)))
