@@ -63,7 +63,7 @@
 3. 使用原始数据进行比较:
 ```shell
 # -d1 指定第一个比较源， -d2 指定第二个比较源
-./diff.clj -d0 ./paypal/fofa -d2 ./paypal/chaos -o ./diff.html
+./diff.clj -d1 ./paypal/fofa -d2 ./paypal/chaos -o ./diff.html
 ```
 
 
@@ -77,7 +77,7 @@
 
 进行diff
 ``` shell
-./diff.clj -d0 ./paypal/fofa-dns -d2 ./paypal/chaos-dns -o dns-diff.html
+./diff.clj -d1 ./paypal/fofa-dns -d2 ./paypal/chaos-dns -o dns-diff.html
 ```
 
 

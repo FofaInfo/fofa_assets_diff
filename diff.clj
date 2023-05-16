@@ -20,8 +20,12 @@
 
 (defn diff-set
   [s1 s2]
-  (let [ss1 (set s1)
-        ss2 (set s2)]
+  (let [ss1 (->> s1
+                 (remove (comp not seq))
+                 set)
+        ss2 (->> s2
+                 (remove (comp not seq))
+                 set)]
     {:same (set/intersection ss1 ss2)
      :add (set/difference ss2 ss1)
      :miss (set/difference ss1 ss2)}))
