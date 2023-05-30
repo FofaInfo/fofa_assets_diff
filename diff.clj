@@ -40,7 +40,7 @@
 
 (require '[hiccup.core :refer [html]])
 
-(defn generate-html [data-list]
+(defn generate-html [left-name right-name data-list]
   (html [:html
     [:head
      [:title "Diff Comparison Report"]
@@ -88,9 +88,9 @@
       [:thead
        [:tr 
         [:th "Diff"]
-        [:th {:class "add"} "Add"]
+        [:th {:class "add"} (str right-name "-Add")]
         [:th {:class "same"} "Same"]
-        [:th {:class "miss"} "Miss"]]]
+        [:th {:class "miss"} (str left-name "-Add")]]]
       [:tbody
        (for [data data-list]
          (let [{:keys [title diff]} data
@@ -218,6 +218,10 @@
   (println "  options:")
   (println (cli/format-opts {:spec cli-options})))
 
+(defn get-path-name
+  [path]
+  (str (last (fs/components path))))
+
 (defn -main [& args]
   (let [{:keys [d1-path d2-path resolved-dns out-file help]} (cli/parse-opts args {:spec cli-options})]
     (when help
@@ -233,6 +237,8 @@
           d2-hosts (read-hosts d2-path)
           d1-root-domains (keys d1-hosts)
           d2-root-domains (keys d2-hosts)
+          left-name (get-path-name d1-path)
+          right-name (get-path-name d2-path)
           all-domains (set (concat d1-root-domains d2-root-domains))]
       (->> all-domains
            (map (fn [d]
@@ -240,7 +246,7 @@
                    :diff (diff-set (get d1-hosts d) (get d2-hosts d))}))
            (concat [{:title "root-domains"
                      :diff (diff-set d1-root-domains d2-root-domains)}])
-           generate-html
+           (generate-html left-name right-name)
            (spit out-file)))))
 
 (try

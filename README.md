@@ -85,6 +85,7 @@
 
 检测数据http访问:
 ```shell
+# 可以使用-k 3保留内容相似的前3个域名，默认为5
 ./http_check.clj -p paypal/fofa -o ./paypal/fofa-http
 ./http_check.clj -p paypal/chaos -o ./paypal/chaos-http
 ```
