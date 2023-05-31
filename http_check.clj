@@ -72,6 +72,11 @@
                         :alias :o
                         :coerce fs/file
                         }
+                  ;; 不过滤内容相同的域名
+                  :no-filter {:default false
+                              :alias :n
+                              :coerce :boolean
+                              }
                   ;; 保留parent相同的子域名, 默认为true,如果为false则过滤所有内容相似的子域名
                   :keep-parent {:default true
                                 :alias :e
@@ -85,6 +90,8 @@
                   :help {:coerce :boolean
                          :alias :h}})
 
+(require '[clojure.tools.logging :as log])
+
 (defn print-opts
   []
   (println)
@@ -93,7 +100,7 @@
   (println (cli/format-opts {:spec cli-options})))
 
 (defn -main [& args]
-  (let [{:keys [path out keep-parent keep help]} (cli/parse-opts args {:spec cli-options})]
+  (let [{:keys [path out no-filter keep-parent keep help]} (cli/parse-opts args {:spec cli-options})]
     (when help
       (print-opts)
       (System/exit 0))
@@ -101,14 +108,28 @@
     (when-not (fs/exists? out)
       (fs/create-dirs out))
 
+    (cond
+      no-filter
+      (log/info "Disable HTTP content similarity filter.")
+
+      keep-parent
+      (log/info "Keep" keep "domains with similar HTTP content for each parent domain.")
+
+      (pos? keep)
+      (log/info "Keep" keep "domains with similar HTTP content.")
+
+      :else
+      (log/info "Disable HTTP content similarity filter."))
+
     (doseq [f1 (-> (fs/expand-home path)
                    (fs/glob "*.txt"))]
       (println "http probe process" (str f1))
       (let [hosts (run-httpx f1)]
         (when (seq hosts)
           (let [hosts (->> (cond
+                             no-filter hosts
                              keep-parent (filter-same-parent keep hosts)
-                             keep (filter-sim-domains keep hosts)
+                             (pos? keep) (filter-sim-domains keep hosts)
                              :else hosts)
                            (map :host))]
             (spit

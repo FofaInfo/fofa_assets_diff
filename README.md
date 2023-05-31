@@ -87,8 +87,16 @@
 
 检测数据http访问:
 ```shell
-# 可以使用-e false 开关保留所有内容相似的域名的前k个，如果不指定则默认为true: 每个上级域名保存前k个相似的域名
-# 可以使用-k 3保留内容相似的前3个域名，默认为5
+# 可以使用 -n 开关 关闭http内容相似过滤
+./http_check.clj -n -p paypal/fofa -o ./paypal/fofa-http
+
+# 可以使用-k 3保留每个上级域名下内容相似的前3个域名，默认为5
+./http_check.clj -k 3 -p paypal/fofa -o ./paypal/fofa-http
+
+# 可以使用-e false 选项保留所有内容相似的域名的前k个，如果不指定则默认为true: 每个上级域名保存前k个相似的域名
+./http_check.clj -e false -k 3 -p paypal/fofa -o ./paypal/fofa-http
+
+# 默认为每个上级域名保留内容相似的前5个子域名
 ./http_check.clj -p paypal/fofa -o ./paypal/fofa-http
 ./http_check.clj -p paypal/chaos -o ./paypal/chaos-http
 ```
