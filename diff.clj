@@ -15,7 +15,9 @@
       (->> (map #(vector (fs/strip-ext (fs/file-name %))
                          (-> (slurp (str %))
                              str/split-lines
+                             (->> (filter seq))
                              set)))
+           (filter (comp pos? count second))
            (into {}))))
 
 (defn diff-set
@@ -231,6 +233,7 @@
                         (if resolved-dns
                           (->> (read-chaos-infos path)
                                (map #(vector (:domain %) (set (:hosts %))))
+                               (filter (comp pos? count second))
                                (into {}))
                           (read-chaos-hosts path)))
           d1-hosts (read-hosts d1-path)

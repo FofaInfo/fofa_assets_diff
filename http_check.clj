@@ -2,11 +2,19 @@
 
 (load-file "util.clj")
 
+(defn get-parent-domain
+  [domain]
+  (->> (str/split domain #"\.")
+       rest
+       (str/join ".")))
+
 (defn parse-http-info
   [line]
   (when-some [info (re-find #"(http.*)\s\[(\d+)\]" line)]
-    {:host (get-uri-domain (second info))
-     :hash (last info)}))
+    (let [domain (get-uri-domain (second info))]
+      {:host domain
+       :parent (get-parent-domain domain)
+       :hash (last info)})))
 
 (comment
   (parse-http-info "https://apacheckouthy.beta.venmo.com [15074220298716777414]")
@@ -27,8 +35,14 @@
   (->> (group-by :hash rs)
        (mapcat (fn [[k vs]]
                  (->> (sort-by :host vs)
-                      (take keep-num)
-                      (map :host))))))
+                      (take keep-num))))))
+
+(defn filter-same-parent
+  "相同子域的域名保留keep-num个"
+  [keep-num rs]
+  (->> (group-by :parent rs)
+       (mapcat (fn [[p-domain vs]]
+                 (filter-sim-domains keep-num vs)))))
 
 (comment
   (defn hamming-distance [str1 str2]
@@ -39,6 +53,10 @@
   (def rs (run-httpx "./paypal/venn2.txt"))
 
   (filter-sim-domains 5 rs)
+
+  (def rps (map #(assoc % :parent (get-parent-domain (:host %))) rs))
+
+  (filter-same-parent 5 rps)
 
   )
 
@@ -54,7 +72,12 @@
                         :alias :o
                         :coerce fs/file
                         }
-                  ;; 保留内容相似的前k的域名
+                  ;; 保留parent相同的子域名, 默认为true,如果为false则过滤所有内容相似的子域名
+                  :keep-parent {:default true
+                                :alias :e
+                                :coerce :boolean
+                                }
+                  ;; 保留内容相似的前k的域名, 如果:keep-parent为true，则每个层级的子域名，保留前k个相似内容的域名
                   :keep {:default 5
                          :alias :k
                          :coerce :long
@@ -70,7 +93,7 @@
   (println (cli/format-opts {:spec cli-options})))
 
 (defn -main [& args]
-  (let [{:keys [path out keep help]} (cli/parse-opts args {:spec cli-options})]
+  (let [{:keys [path out keep-parent keep help]} (cli/parse-opts args {:spec cli-options})]
     (when help
       (print-opts)
       (System/exit 0))
@@ -81,12 +104,16 @@
     (doseq [f1 (-> (fs/expand-home path)
                    (fs/glob "*.txt"))]
       (println "http probe process" (str f1))
-      (let [hosts (->> (run-httpx f1)
-                       (filter-sim-domains keep))]
+      (let [hosts (run-httpx f1)]
         (when (seq hosts)
-          (spit
-           (str (fs/file out (fs/file-name f1)))
-           (str/join "\n" (set hosts))))))))
+          (let [hosts (->> (cond
+                             keep-parent (filter-same-parent keep hosts)
+                             keep (filter-sim-domains keep hosts)
+                             :else hosts)
+                           (map :host))]
+            (spit
+             (str (fs/file out (fs/file-name f1)))
+             (str/join "\n" (set hosts)))))))))
 
 (try
   (apply -main *command-line-args*)
